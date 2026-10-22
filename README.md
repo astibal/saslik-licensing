@@ -154,7 +154,24 @@ saslik-license-issuer keygen \
 
 The command refuses to overwrite either file. The private key is created with
 mode `0600`; keep it offline and backed up. Only the public file belongs in
-Saslik's workspace settings.
+Saslik's workspace settings. It also prints the complete TXT value for
+`_saslik-license.saslik.io`, its SHA-256 fingerprint, a `dig` verification
+command and the manual workspace fallback. Override the defaults when issuing
+for another product or domain:
+
+```bash
+saslik-license-issuer keygen \
+  --private issuer-private.pem \
+  --public issuer-public.pem \
+  --issuer smithproxy \
+  --dns-name _saslik-license.saslik.io
+```
+
+The TXT record is a distribution mechanism, not a trust anchor by itself. Its
+embedded SHA-256 value identifies the key but cannot make an unauthenticated DNS
+answer trustworthy. Saslik must pin that fingerprint, validate DNSSEC, or fetch
+through another authenticated channel before trusting an automatically
+discovered key.
 
 Issue a license for a relative validity period:
 

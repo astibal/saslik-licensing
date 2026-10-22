@@ -7,8 +7,10 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -70,7 +72,77 @@ void require_new_file(fs::path const& path) {
     }
 }
 
-void generate_keys(fs::path const& private_path, fs::path const& public_path) {
+std::string base64(std::vector<unsigned char> const& bytes) {
+    std::string encoded(4 * ((bytes.size() + 2) / 3), '\0');
+    auto size = EVP_EncodeBlock(
+        reinterpret_cast<unsigned char*>(encoded.data()), bytes.data(),
+        static_cast<int>(bytes.size()));
+    if (size < 0) {
+        throw std::runtime_error("cannot encode value as Base64");
+    }
+    encoded.resize(static_cast<std::size_t>(size));
+    return encoded;
+}
+
+std::vector<unsigned char> public_key_der(EVP_PKEY* key) {
+    auto size = i2d_PUBKEY(key, nullptr);
+    if (size <= 0) {
+        throw std::runtime_error("cannot encode public key");
+    }
+
+    std::vector<unsigned char> der(static_cast<std::size_t>(size));
+    auto* destination = der.data();
+    if (i2d_PUBKEY(key, &destination) != size) {
+        throw std::runtime_error("cannot encode public key");
+    }
+    return der;
+}
+
+std::string sha256_fingerprint(std::vector<unsigned char> const& value) {
+    std::vector<unsigned char> digest(EVP_MAX_MD_SIZE);
+    unsigned int digest_size = 0;
+    if (EVP_Digest(value.data(), value.size(), digest.data(), &digest_size,
+                   EVP_sha256(), nullptr) != 1) {
+        throw std::runtime_error("cannot calculate public key fingerprint");
+    }
+    digest.resize(digest_size);
+
+    std::ostringstream output;
+    output << std::hex << std::setfill('0');
+    for (auto byte : digest) {
+        output << std::setw(2) << static_cast<unsigned int>(byte);
+    }
+    return output.str();
+}
+
+void print_dns_reminder(std::string const& dns_name,
+                        std::string const& issuer,
+                        fs::path const& public_path,
+                        EVP_PKEY* key) {
+    auto der = public_key_der(key);
+    auto fingerprint = sha256_fingerprint(der);
+    auto record = "v=saslik1;issuer=" + issuer + ";key=" + base64(der) +
+                  ";sha256=" + fingerprint;
+
+    std::cout
+        << "\nKeys created. Keep the private key offline.\n\n"
+        << "DNS TXT record:\n"
+        << "  name:  " << dns_name << "\n"
+        << "  value: " << record << "\n\n"
+        << "After publishing, verify it with:\n"
+        << "  dig +short TXT " << dns_name << "\n\n"
+        << "Manual Saslik fallback:\n"
+        << "  paste " << public_path
+        << " into Workspace -> Issuer public key\n\n"
+        << "Public key SHA-256:\n"
+        << "  " << fingerprint << "\n\n"
+        << "Reminder: TXT distributes the key; it does not authenticate DNS.\n"
+        << "Pin this fingerprint in Saslik or validate the DNS response.\n";
+}
+
+void generate_keys(fs::path const& private_path, fs::path const& public_path,
+                   std::string const& dns_name,
+                   std::string const& issuer) {
     require_new_file(private_path);
     require_new_file(public_path);
 
@@ -100,6 +172,8 @@ void generate_keys(fs::path const& private_path, fs::path const& public_path) {
     if (!public_file || PEM_write_PUBKEY(public_file.get(), key.get()) != 1) {
         throw std::runtime_error("cannot write public key");
     }
+
+    print_dns_reminder(dns_name, issuer, public_path, key.get());
 }
 
 Key load_private_key(fs::path const& path) {
@@ -114,18 +188,6 @@ Key load_private_key(fs::path const& path) {
         throw std::runtime_error("signing key must be an Ed25519 private key");
     }
     return key;
-}
-
-std::string base64(std::vector<unsigned char> const& bytes) {
-    std::string encoded(4 * ((bytes.size() + 2) / 3), '\0');
-    auto size = EVP_EncodeBlock(
-        reinterpret_cast<unsigned char*>(encoded.data()), bytes.data(),
-        static_cast<int>(bytes.size()));
-    if (size < 0) {
-        throw std::runtime_error("cannot encode signature");
-    }
-    encoded.resize(static_cast<std::size_t>(size));
-    return encoded;
 }
 
 std::string sign_payload(std::string const& payload, EVP_PKEY* key) {
@@ -267,7 +329,8 @@ void issue_license(IssueOptions options) {
 void print_usage() {
     std::cerr
         << "usage:\n"
-        << "  saslik-license-issuer keygen --private FILE --public FILE\n"
+        << "  saslik-license-issuer keygen --private FILE --public FILE "
+           "[--issuer NAME] [--dns-name NAME]\n"
         << "  saslik-license-issuer issue --key FILE --output FILE --id ID "
            "--subject TEXT --valid-days DAYS [options]\n\n"
         << "issue options:\n"
@@ -284,6 +347,8 @@ void print_usage() {
 void keygen_command(int argc, char** argv) {
     fs::path private_path;
     fs::path public_path;
+    std::string issuer = "smithproxy";
+    std::string dns_name = "_saslik-license.saslik.io";
 
     for (int index = 2; index < argc; ++index) {
         std::string option = argv[index];
@@ -292,6 +357,10 @@ void keygen_command(int argc, char** argv) {
             private_path = value;
         } else if (option == "--public") {
             public_path = value;
+        } else if (option == "--issuer") {
+            issuer = value;
+        } else if (option == "--dns-name") {
+            dns_name = value;
         } else {
             throw std::invalid_argument("unknown option: " + option);
         }
@@ -301,7 +370,7 @@ void keygen_command(int argc, char** argv) {
         throw std::invalid_argument(
             "keygen requires --private and --public");
     }
-    generate_keys(private_path, public_path);
+    generate_keys(private_path, public_path, dns_name, issuer);
 }
 
 } // namespace
