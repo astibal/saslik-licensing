@@ -20,13 +20,23 @@ add_executable(saslik-licensectl src/licensectl.cpp)
 target_link_libraries(saslik-licensectl PRIVATE saslik_licensing)
 target_compile_options(saslik-licensectl PRIVATE -Wall -Wextra -Wpedantic)
 
+add_executable(saslik-license-issuer src/issuer.cpp)
+target_link_libraries(saslik-license-issuer PRIVATE saslik_licensing)
+target_compile_options(saslik-license-issuer PRIVATE -Wall -Wextra -Wpedantic)
+
 include(CTest)
 if(BUILD_TESTING)
   add_executable(licensing-tests tests/licensing_tests.cpp)
   target_link_libraries(licensing-tests PRIVATE saslik_licensing)
   add_test(NAME licensing-tests COMMAND licensing-tests)
+  add_test(
+    NAME issuer-tool-tests
+    COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/issuer_tool_tests.sh
+            $<TARGET_FILE:saslik-license-issuer>
+            $<TARGET_FILE:saslik-licensectl>
+            $<TARGET_FILE:saslik-licensingd>)
 endif()
 
-install(TARGETS saslik-licensingd saslik-licensectl RUNTIME DESTINATION bin)
+install(TARGETS saslik-licensingd saslik-licensectl saslik-license-issuer
+        RUNTIME DESTINATION bin)
 install(FILES packaging/saslik-licensing.service DESTINATION lib/systemd/system)
-

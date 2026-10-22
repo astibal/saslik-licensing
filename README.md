@@ -140,3 +140,48 @@ ctest --test-dir build --output-on-failure
 
 This initial implementation intentionally has no networking. Future commerce or
 support portals deliver signed files; the runtime only consumes them locally.
+
+## Offline issuer helper
+
+Do not assemble or sort license files by hand. Generate the signing key pair
+once on an offline issuer machine:
+
+```bash
+saslik-license-issuer keygen \
+  --private saslik-issuer-private.pem \
+  --public saslik-issuer-public.pem
+```
+
+The command refuses to overwrite either file. The private key is created with
+mode `0600`; keep it offline and backed up. Only the public file belongs in
+Saslik's workspace settings.
+
+Issue a license for a relative validity period:
+
+```bash
+saslik-license-issuer issue \
+  --key saslik-issuer-private.pem \
+  --output earlybird-0001.license \
+  --id earlybird-0001 \
+  --subject "Example supporter" \
+  --valid-days 365 \
+  --feature component.lored \
+  --feature support.active \
+  --argument lored:workers=4
+```
+
+`issued_at` defaults to the current time, `not_before` to `issued_at`, and
+`support_until` to the calculated `not_after`. For exact dates, replace
+`--valid-days` with `--not-after UNIX`. The remaining timestamps can also be
+overridden:
+
+```bash
+  --issued-at 1792627200 \
+  --not-before 1792627200 \
+  --support-until 1824163200
+```
+
+The helper validates the fields through the same parser as the runtime,
+canonicalizes their order, signs the exact payload with Ed25519, Base64-encodes
+the signature and writes the final plaintext `.license` file. It also refuses
+to overwrite an existing output file.
