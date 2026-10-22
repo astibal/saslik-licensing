@@ -90,6 +90,15 @@ saslik-licensectl args spider
 # OK<TAB>workers=4<TAB>channel=earlybird
 ```
 
+Saslik can provision a trusted issuer public key through the same local facade:
+
+```bash
+saslik-licensectl install-issuer smithproxy smithproxy-ed25519-public.pem
+```
+
+The daemon accepts only a parseable Ed25519 public key and stores it atomically.
+Private issuer keys never belong on a Saslik machine.
+
 Saslik owns the allow-list translating these values to actual process arguments.
 License text is never appended directly to a command line. Unknown keys are
 ignored and unsafe values are rejected by the component adapter.
@@ -131,4 +140,3 @@ ctest --test-dir build --output-on-failure
 
 This initial implementation intentionally has no networking. Future commerce or
 support portals deliver signed files; the runtime only consumes them locally.
-
