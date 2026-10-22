@@ -1,0 +1,22 @@
+[Unit]
+Description=Saslik local licensing and feature service
+After=local-fs.target
+Before=saslik.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/saslik-licensingd
+RuntimeDirectory=saslik
+StateDirectory=saslik-licensing
+ConfigurationDirectory=saslik/licensing/issuers.d
+Restart=on-failure
+RestartSec=1s
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/saslik-licensing /run/saslik
+
+[Install]
+WantedBy=multi-user.target
+
