@@ -143,35 +143,54 @@ support portals deliver signed files; the runtime only consumes them locally.
 
 ## Offline issuer helper
 
-Do not assemble or sort license files by hand. Generate the signing key pair
-once on an offline issuer machine:
+Do not assemble or sort license files by hand. First create a long-lived root
+key on an offline machine. The root signs operational public keys, not customer
+licenses:
 
 ```bash
-saslik-license-issuer keygen \
-  --private saslik-issuer-private.pem \
-  --public saslik-issuer-public.pem
+saslik-license-issuer root-keygen \
+  --private saslik-root-private.pem \
+  --public saslik-root-public.pem
 ```
 
-The command refuses to overwrite either file. The private key is created with
-mode `0600`; keep it offline and backed up. Only the public file belongs in
-Saslik's workspace settings. It also prints the complete TXT value for
-`_saslik-license.saslik.io`, its SHA-256 fingerprint, a `dig` verification
-command and the manual workspace fallback. Override the defaults when issuing
-for another product or domain:
+Pin `saslik-root-public.pem` in Saslik releases. Keep the root private key
+offline and use it to create a rotatable operational issuer key plus its signed
+DNS record:
 
 ```bash
 saslik-license-issuer keygen \
   --private issuer-private.pem \
   --public issuer-public.pem \
+  --root-key saslik-root-private.pem \
+  --txt-output saslik-license-dns.txt \
   --issuer smithproxy \
-  --dns-name _saslik-license.saslik.io
+  --dns-name _saslik-license.saslik.io \
+  --valid-days 365
 ```
 
-The TXT record is a distribution mechanism, not a trust anchor by itself. Its
-embedded SHA-256 value identifies the key but cannot make an unauthenticated DNS
-answer trustworthy. Saslik must pin that fingerprint, validate DNSSEC, or fetch
-through another authenticated channel before trusting an automatically
-discovered key.
+The command prints the complete TXT record and a `dig` reminder. Verify a saved
+record against the pinned root before publishing or consuming it:
+
+```bash
+saslik-license-issuer dns-verify \
+  --root-key saslik-root-public.pem \
+  --input saslik-license-dns.txt
+```
+
+For rotation, sign an already generated operational public key with
+`dns-sign --root-key ... --key ...`. The signed canonical payload includes the
+issuer, operational key, `not_before` and `not_after`. A forged or stale DNS
+answer therefore cannot introduce a trusted license-signing key.
+
+All key-generation commands refuse to overwrite existing files. Private keys
+are created with mode `0600`.
+
+The runtime daemon pins the root public key at
+`/etc/saslik/licensing/root.pem`. Saslik automatically queries the TXT record
+at `_saslik-license.saslik.io`, sends it to the daemon for signature and
+validity checks, and caches it only after acceptance. DNS failure falls back to
+the last accepted record. If neither the root key nor a usable record exists,
+Saslik simply runs in community mode.
 
 Issue a license for a relative validity period:
 

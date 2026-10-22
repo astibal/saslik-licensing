@@ -19,7 +19,7 @@ int main(int argc, char** argv) {
         std::cerr
             << "usage: saslik-licensectl [--socket PATH] "
                "status|has FEATURE|args COMPONENT|install FILE|"
-               "install-issuer NAME FILE\n";
+               "install-issuer NAME FILE|install-signed-issuer FILE\n";
         return 2;
     }
 
@@ -50,6 +50,16 @@ int main(int argc, char** argv) {
             body.assign(std::istreambuf_iterator<char>(input), {});
             request = "INSTALL-ISSUER " + name + " " +
                       std::to_string(body.size());
+        } else if (action == "install-signed-issuer" && index < argc) {
+            std::ifstream input(argv[index], std::ios::binary);
+            if (!input) {
+                throw std::runtime_error("cannot read signed issuer record");
+            }
+            body.assign(std::istreambuf_iterator<char>(input), {});
+            while (!body.empty() && (body.back() == '\n' || body.back() == '\r')) {
+                body.pop_back();
+            }
+            request = "INSTALL-SIGNED-ISSUER " + std::to_string(body.size());
         } else {
             throw std::runtime_error("invalid command");
         }

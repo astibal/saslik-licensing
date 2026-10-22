@@ -1,4 +1,5 @@
 #include "saslik/licensing.hpp"
+#include "saslik/dns_key.hpp"
 
 #include <algorithm>
 #include <array>
@@ -113,6 +114,7 @@ static void install_issuer(fs::path const& issuers, std::string const& name,
 }
 
 static std::string handle(Store const& store, fs::path const& issuers,
+                          fs::path const& root_key,
                           std::string const& request) {
     auto newline = request.find('\n');
     auto command = request.substr(0, newline);
@@ -129,6 +131,18 @@ static std::string handle(Store const& store, fs::path const& issuers,
         }
         install_issuer(issuers, name, body);
         return "OK issuer=" + name + "\n";
+    }
+    if (command.rfind("INSTALL-SIGNED-ISSUER ", 0) == 0) {
+        auto expected = std::stoull(command.substr(22));
+        if (expected != body.size()) {
+            throw std::runtime_error("signed issuer record size mismatch");
+        }
+        auto record = saslik::licensing::parse_dns_key_record(body);
+        saslik::licensing::verify_dns_key_record(record, root_key,
+                                                  current_time());
+        install_issuer(issuers, record.issuer,
+                       saslik::licensing::dns_key_as_pem(record));
+        return "OK issuer=" + record.issuer + "\n";
     }
     if (command.rfind("INSTALL ", 0) == 0) {
         auto expected = std::stoull(command.substr(8));
@@ -176,6 +190,7 @@ int main(int argc, char** argv) {
     fs::path storage = "/var/lib/saslik-licensing/licenses.d";
     fs::path issuers = "/etc/saslik/licensing/issuers.d";
     fs::path socket_path = "/run/saslik/licensing.sock";
+    fs::path root_key = "/etc/saslik/licensing/root.pem";
 
     for (int index = 1; index < argc; ++index) {
         std::string option = argv[index];
@@ -189,6 +204,8 @@ int main(int argc, char** argv) {
             issuers = argv[++index];
         } else if (option == "--socket") {
             socket_path = argv[++index];
+        } else if (option == "--root-key") {
+            root_key = argv[++index];
         } else {
             std::cerr << "unknown option: " << option << '\n';
             return 2;
@@ -241,7 +258,8 @@ int main(int argc, char** argv) {
         }
 
         try {
-            auto response = handle(store, issuers, read_request(client));
+            auto response =
+                handle(store, issuers, root_key, read_request(client));
             ::send(client, response.data(), response.size(), MSG_NOSIGNAL);
         } catch (std::exception const& error) {
             auto response = std::string("ERR ") + error.what() + "\n";

@@ -18,17 +18,31 @@ trap cleanup EXIT
 
 private_key="$workdir/issuer-private.pem"
 public_key="$workdir/issuer-public.pem"
+root_private_key="$workdir/root-private.pem"
+root_public_key="$workdir/root-public.pem"
+dns_record="$workdir/dns-record.txt"
 license="$workdir/supporter.license"
 socket="$workdir/licensing.sock"
 
+"$issuer" root-keygen \
+    --private "$root_private_key" \
+    --public "$root_public_key"
+
 keygen_output=$("$issuer" keygen \
     --private "$private_key" \
-    --public "$public_key")
+    --public "$public_key" \
+    --root-key "$root_private_key" \
+    --txt-output "$dns_record")
 
+grep -q 'Root-signed DNS TXT record' <<<"$keygen_output"
 grep -q 'name:  _saslik-license.saslik.io' <<<"$keygen_output"
-grep -q 'value: v=saslik1;issuer=smithproxy;key=' <<<"$keygen_output"
-grep -Eq 'sha256=[0-9a-f]{64}' <<<"$keygen_output"
+grep -q 'value: v=saslik1;issuer=smithproxy;not_before=' <<<"$keygen_output"
+grep -q ';signature=' "$dns_record"
 grep -q 'dig +short TXT _saslik-license.saslik.io' <<<"$keygen_output"
+
+"$issuer" dns-verify \
+    --root-key "$root_public_key" \
+    --input "$dns_record"
 
 "$issuer" issue \
     --key "$private_key" \
@@ -44,6 +58,7 @@ grep -q 'dig +short TXT _saslik-license.saslik.io' <<<"$keygen_output"
 "$daemon" \
     --storage "$workdir/licenses" \
     --issuers "$workdir/issuers" \
+    --root-key "$root_public_key" \
     --socket "$socket" &
 daemon_pid=$!
 
@@ -53,8 +68,13 @@ for _ in {1..50}; do
 done
 [[ -S $socket ]]
 
-"$licensectl" --socket "$socket" \
-    install-issuer smithproxy "$public_key"
+"$licensectl" --socket "$socket" install-signed-issuer "$dns_record"
 "$licensectl" --socket "$socket" install "$license"
 [[ $("$licensectl" --socket "$socket" has component.lored) == "OK 1" ]]
 [[ $("$licensectl" --socket "$socket" args lored) == $'OK\tworkers=4' ]]
+
+sed 's/issuer=smithproxy/issuer=attacker/' "$dns_record" > "$workdir/tampered.txt"
+if "$licensectl" --socket "$socket" install-signed-issuer "$workdir/tampered.txt"; then
+    echo "tampered DNS record was accepted" >&2
+    exit 1
+fi

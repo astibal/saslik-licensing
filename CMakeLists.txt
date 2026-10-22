@@ -7,7 +7,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(OpenSSL 3.0 REQUIRED COMPONENTS Crypto)
 
-add_library(saslik_licensing STATIC src/licensing.cpp)
+add_library(saslik_licensing STATIC src/licensing.cpp src/dns_key.cpp)
 target_include_directories(saslik_licensing PUBLIC include)
 target_link_libraries(saslik_licensing PUBLIC OpenSSL::Crypto)
 target_compile_options(saslik_licensing PRIVATE -Wall -Wextra -Wpedantic)
