@@ -2,6 +2,7 @@
 
 #include <openssl/evp.h>
 #include <openssl/pem.h>
+#include <openssl/sha.h>
 
 #include <algorithm>
 #include <array>
@@ -9,6 +10,7 @@
 #include <cerrno>
 #include <cstring>
 #include <fstream>
+#include <iomanip>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
@@ -229,6 +231,44 @@ void verify_license(License const& license, fs::path const& issuers_dir, std::in
                          payload.size()) != 1) {
         throw std::runtime_error("license signature verification failed");
     }
+}
+
+std::string public_key_fingerprint(fs::path const& public_key) {
+    struct FileCloser {
+        void operator()(FILE* value) const {
+            if (value) {
+                fclose(value);
+            }
+        }
+    };
+    std::unique_ptr<FILE, FileCloser> file(fopen(public_key.c_str(), "r"));
+    if (!file) {
+        throw std::runtime_error("cannot open public key");
+    }
+    std::unique_ptr<EVP_PKEY, decltype(&EVP_PKEY_free)> key(
+        PEM_read_PUBKEY(file.get(), nullptr, nullptr, nullptr), &EVP_PKEY_free);
+    if (!key) {
+        throw std::runtime_error("invalid public key");
+    }
+    auto der_size = i2d_PUBKEY(key.get(), nullptr);
+    if (der_size <= 0) {
+        throw std::runtime_error("cannot encode public key");
+    }
+    std::vector<unsigned char> der(static_cast<std::size_t>(der_size));
+    auto* cursor = der.data();
+    if (i2d_PUBKEY(key.get(), &cursor) != der_size) {
+        throw std::runtime_error("cannot encode public key");
+    }
+    std::array<unsigned char, SHA256_DIGEST_LENGTH> digest{};
+    if (!SHA256(der.data(), der.size(), digest.data())) {
+        throw std::runtime_error("cannot fingerprint public key");
+    }
+    std::ostringstream output;
+    output << std::uppercase << std::hex << std::setfill('0');
+    for (auto byte : digest) {
+        output << std::setw(2) << static_cast<unsigned int>(byte);
+    }
+    return output.str();
 }
 
 Store::Store(fs::path licenses_dir, fs::path issuers_dir)

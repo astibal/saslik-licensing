@@ -46,6 +46,20 @@ Defaults:
 Only public issuer keys are deployed. License creation and private keys belong
 to a separate offline issuer tool and are intentionally outside this runtime.
 
+`saslik-licensectl status` renders the verified trust chain and active licenses
+without exposing signatures or complete license payloads. These IDs and feature
+names are illustrative; the command always reports the actual installed state:
+
+```text
+Licensing trust
+  Root       v1 · A31F…92C0
+  Signing    saslik.io-authority/v1 · 781B…04EF
+
+Valid licenses
+  earlybird-1    earlybird · tuntom
+  lored-feed     lored
+```
+
 ## License format
 
 The format is intentionally strict, canonical and dependency-free. Timestamps

@@ -37,6 +37,7 @@ License parse_license(std::string const& text);
 std::string canonical_payload(License const& license);
 void verify_license(License const& license, std::filesystem::path const& issuers_dir,
                     std::int64_t now);
+std::string public_key_fingerprint(std::filesystem::path const& public_key);
 
 class Store {
 public:
@@ -53,4 +54,3 @@ std::string query_socket(std::filesystem::path const& socket, std::string const&
                          std::string const& body = {});
 
 } // namespace saslik::licensing
-

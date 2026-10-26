@@ -154,6 +154,48 @@ static std::string handle(Store const& store, fs::path const& issuers,
     }
 
     auto state = store.state(current_time());
+    if (command == "REPORT") {
+        std::ostringstream out;
+        out << "OK\nROOT\tv1\t";
+        try {
+            out << saslik::licensing::public_key_fingerprint(root_key);
+        } catch (std::exception const&) {
+            out << '-';
+        }
+        out << '\n';
+
+        std::vector<fs::path> signing_keys;
+        std::error_code error;
+        if (fs::is_directory(issuers, error)) {
+            for (auto const& entry : fs::directory_iterator(issuers)) {
+                if (entry.is_regular_file() && entry.path().extension() == ".pem") {
+                    signing_keys.push_back(entry.path());
+                }
+            }
+        }
+        std::sort(signing_keys.begin(), signing_keys.end());
+        for (auto const& key : signing_keys) {
+            auto issuer = key.stem().string();
+            if (!safe_token(issuer)) {
+                continue;
+            }
+            out << "SIGNING\t" << issuer << "\tv1\t";
+            try {
+                out << saslik::licensing::public_key_fingerprint(key);
+            } catch (std::exception const&) {
+                out << '-';
+            }
+            out << '\n';
+        }
+        for (auto const& license : state.active) {
+            out << "LICENSE\t" << license.id;
+            for (auto const& feature : license.features) {
+                out << '\t' << feature;
+            }
+            out << '\n';
+        }
+        return out.str();
+    }
     if (command == "SUMMARY") {
         std::ostringstream out;
         out << "OK licenses=" << state.active.size()

@@ -73,6 +73,13 @@ done
 [[ $("$licensectl" --socket "$socket" has component.lored) == "OK 1" ]]
 [[ $("$licensectl" --socket "$socket" args lored) == $'OK\tworkers=4' ]]
 
+status=$("$licensectl" --socket "$socket" status)
+grep -q '^Licensing trust$' <<<"$status"
+grep -Eq '^  Root +v1 · [0-9A-F]{4}…[0-9A-F]{4}$' <<<"$status"
+grep -Eq '^  Signing +saslik.io-authority/v1 · [0-9A-F]{4}…[0-9A-F]{4}$' <<<"$status"
+grep -q '^Valid licenses$' <<<"$status"
+grep -Eq '^  test-supporter +lored$' <<<"$status"
+
 sed 's/issuer=saslik.io-authority/issuer=attacker/' "$dns_record" > "$workdir/tampered.txt"
 if "$licensectl" --socket "$socket" install-signed-issuer "$workdir/tampered.txt"; then
     echo "tampered DNS record was accepted" >&2
