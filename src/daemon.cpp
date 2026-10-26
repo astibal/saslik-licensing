@@ -115,12 +115,17 @@ static void install_issuer(fs::path const& issuers, std::string const& name,
 
 static std::string handle(Store const& store, fs::path const& issuers,
                           fs::path const& root_key,
-                          std::string const& request) {
+                          std::string const& request, bool may_install) {
     auto newline = request.find('\n');
     auto command = request.substr(0, newline);
     auto body = newline == std::string::npos ? std::string{} : request.substr(newline + 1);
     if (command == "PING") {
         return "OK pong\n";
+    }
+    if ((command.rfind("INSTALL ", 0) == 0 ||
+         command.rfind("INSTALL-ISSUER ", 0) == 0 ||
+         command.rfind("INSTALL-SIGNED-ISSUER ", 0) == 0) && !may_install) {
+        throw std::runtime_error("install operations require the daemon owner");
     }
     if (command.rfind("INSTALL-ISSUER ", 0) == 0) {
         std::istringstream options(command.substr(15));
@@ -280,7 +285,10 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    ::chmod(socket_path.c_str(), 0660);
+    // Status and entitlement queries are intentionally available to local
+    // applications. Mutating commands are authorized independently with
+    // SO_PEERCRED below, so socket permissions are not the security boundary.
+    ::chmod(socket_path.c_str(), 0666);
     listener_fd = listener;
     std::signal(SIGINT, stop);
     std::signal(SIGTERM, stop);
@@ -300,8 +308,16 @@ int main(int argc, char** argv) {
         }
 
         try {
+            ucred credentials{};
+            socklen_t credentials_size = sizeof(credentials);
+            if (::getsockopt(client, SOL_SOCKET, SO_PEERCRED, &credentials,
+                             &credentials_size) != 0 ||
+                credentials_size != sizeof(credentials)) {
+                throw std::runtime_error("cannot authenticate local client");
+            }
             auto response =
-                handle(store, issuers, root_key, read_request(client));
+                handle(store, issuers, root_key, read_request(client),
+                       credentials.uid == ::geteuid());
             ::send(client, response.data(), response.size(), MSG_NOSIGNAL);
         } catch (std::exception const& error) {
             auto response = std::string("ERR ") + error.what() + "\n";
