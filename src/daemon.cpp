@@ -115,17 +115,22 @@ static void install_issuer(fs::path const& issuers, std::string const& name,
 
 static std::string handle(Store const& store, fs::path const& issuers,
                           fs::path const& root_key,
-                          std::string const& request, bool may_install) {
+                          std::string const& request,
+                          bool may_install_raw_issuer) {
     auto newline = request.find('\n');
     auto command = request.substr(0, newline);
     auto body = newline == std::string::npos ? std::string{} : request.substr(newline + 1);
     if (command == "PING") {
         return "OK pong\n";
     }
-    if ((command.rfind("INSTALL ", 0) == 0 ||
-         command.rfind("INSTALL-ISSUER ", 0) == 0 ||
-         command.rfind("INSTALL-SIGNED-ISSUER ", 0) == 0) && !may_install) {
-        throw std::runtime_error("install operations require the daemon owner");
+    // Signed issuer records and licenses are safe to accept from an
+    // unprivileged local client: their trust chains are verified below before
+    // anything is persisted. Installing a raw issuer key bypasses that chain
+    // and therefore remains restricted to the daemon owner.
+    if (command.rfind("INSTALL-ISSUER ", 0) == 0 &&
+        !may_install_raw_issuer) {
+        throw std::runtime_error(
+            "raw issuer installation requires the daemon owner");
     }
     if (command.rfind("INSTALL-ISSUER ", 0) == 0) {
         std::istringstream options(command.substr(15));
