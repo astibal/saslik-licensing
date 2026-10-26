@@ -54,7 +54,7 @@ are Unix seconds. Features and arguments are sorted before signature checking.
 ```text
 SASLIK-LICENSE/1
 id=earlybird-0001
-issuer=smithproxy
+issuer=saslik.io-authority
 product=saslik
 subject=Example supporter
 issued_at=1792627200
@@ -93,7 +93,7 @@ saslik-licensectl args spider
 Saslik can provision a trusted issuer public key through the same local facade:
 
 ```bash
-saslik-licensectl install-issuer smithproxy smithproxy-ed25519-public.pem
+saslik-licensectl install-issuer saslik.io-authority saslik-issuer-public.pem
 ```
 
 The daemon accepts only a parseable Ed25519 public key and stores it atomically.
@@ -163,7 +163,7 @@ saslik-license-issuer keygen \
   --public issuer-public.pem \
   --root-key saslik-root-private.pem \
   --txt-output saslik-license-dns.txt \
-  --issuer smithproxy \
+  --issuer saslik.io-authority \
   --dns-name _saslik-license.saslik.io \
   --valid-days 365
 ```
@@ -191,6 +191,15 @@ at `_saslik-license.saslik.io`, sends it to the daemon for signature and
 validity checks, and caches it only after acceptance. DNS failure falls back to
 the last accepted record. If neither the root key nor a usable record exists,
 Saslik simply runs in community mode.
+
+The repository carries that trust anchor as
+`packaging/keys/saslik-root-public.pem`. `cmake --install` installs the same
+file as `/etc/saslik/licensing/root.pem`. Its SHA-256 fingerprint (DER public
+key) is:
+
+```text
+5feeb49a8421498fb4c94024c7cbcc60f99f49b3858c2330c9901f36df829cc4
+```
 
 Issue a license for a relative validity period:
 

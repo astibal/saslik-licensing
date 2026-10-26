@@ -218,7 +218,7 @@ struct IssueOptions {
 
 IssueOptions parse_issue_options(int argc, char** argv) {
     IssueOptions options;
-    options.license.issuer = "smithproxy";
+    options.license.issuer = "saslik.io-authority";
     options.license.product = "saslik";
     options.license.issued_at = current_time();
 
@@ -326,7 +326,7 @@ struct DnsSignOptions {
     fs::path root_private_key;
     fs::path operational_public_key;
     fs::path output;
-    std::string issuer = "smithproxy";
+    std::string issuer = "saslik.io-authority";
     std::string dns_name = "_saslik-license.saslik.io";
     std::int64_t valid_days = 365;
 };
@@ -445,7 +445,7 @@ void print_usage() {
         << "  saslik-license-issuer issue --key FILE --output FILE --id ID "
            "--subject TEXT --valid-days DAYS [options]\n\n"
         << "issue options:\n"
-        << "  --issuer NAME           default: smithproxy\n"
+        << "  --issuer NAME           default: saslik.io-authority\n"
         << "  --issued-at UNIX        default: now\n"
         << "  --not-before UNIX       default: issued-at\n"
         << "  --valid-days DAYS       relative validity period\n"
@@ -460,7 +460,7 @@ void keygen_command(int argc, char** argv) {
     fs::path public_path;
     fs::path root_private_key;
     fs::path txt_output;
-    std::string issuer = "smithproxy";
+    std::string issuer = "saslik.io-authority";
     std::string dns_name = "_saslik-license.saslik.io";
     std::int64_t valid_days = 365;
 

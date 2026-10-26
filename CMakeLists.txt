@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.20)
 project(saslik_licensing VERSION 0.1.0 LANGUAGES CXX)
 
+set(SASLIK_CONFIG_DIR "/etc/saslik/licensing" CACHE PATH
+    "System directory for Saslik licensing trust configuration")
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -35,8 +38,16 @@ if(BUILD_TESTING)
             $<TARGET_FILE:saslik-license-issuer>
             $<TARGET_FILE:saslik-licensectl>
             $<TARGET_FILE:saslik-licensingd>)
+  add_test(
+    NAME install-layout-tests
+    COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/install_layout_tests.sh
+            ${CMAKE_COMMAND} ${CMAKE_BINARY_DIR}
+            ${CMAKE_CURRENT_SOURCE_DIR}/packaging/keys/saslik-root-public.pem)
 endif()
 
 install(TARGETS saslik-licensingd saslik-licensectl saslik-license-issuer
         RUNTIME DESTINATION bin)
 install(FILES packaging/saslik-licensing.service DESTINATION lib/systemd/system)
+install(FILES packaging/keys/saslik-root-public.pem
+        DESTINATION ${SASLIK_CONFIG_DIR}
+        RENAME root.pem)

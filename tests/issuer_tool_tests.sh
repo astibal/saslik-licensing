@@ -36,7 +36,7 @@ keygen_output=$("$issuer" keygen \
 
 grep -q 'Root-signed DNS TXT record' <<<"$keygen_output"
 grep -q 'name:  _saslik-license.saslik.io' <<<"$keygen_output"
-grep -q 'value: v=saslik1;issuer=smithproxy;not_before=' <<<"$keygen_output"
+grep -q 'value: v=saslik1;issuer=saslik.io-authority;not_before=' <<<"$keygen_output"
 grep -q ';signature=' "$dns_record"
 grep -q 'dig +short TXT _saslik-license.saslik.io' <<<"$keygen_output"
 
@@ -73,7 +73,7 @@ done
 [[ $("$licensectl" --socket "$socket" has component.lored) == "OK 1" ]]
 [[ $("$licensectl" --socket "$socket" args lored) == $'OK\tworkers=4' ]]
 
-sed 's/issuer=smithproxy/issuer=attacker/' "$dns_record" > "$workdir/tampered.txt"
+sed 's/issuer=saslik.io-authority/issuer=attacker/' "$dns_record" > "$workdir/tampered.txt"
 if "$licensectl" --socket "$socket" install-signed-issuer "$workdir/tampered.txt"; then
     echo "tampered DNS record was accepted" >&2
     exit 1

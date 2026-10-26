@@ -6,7 +6,7 @@
 int main() {
     auto license = saslik::licensing::parse_license(
         "SASLIK-LICENSE/1\n"
-        "id=earlybird-1\nissuer=smithproxy\nproduct=saslik\nsubject=Example supporter\n"
+        "id=earlybird-1\nissuer=saslik.io-authority\nproduct=saslik\nsubject=Example supporter\n"
         "issued_at=100\nnot_before=100\nnot_after=200\nsupport_until=190\n"
         "feature=component.spider\nfeature=component.viewer\n"
         "argument=spider:workers=4\nsignature=AAAA\n");
@@ -18,4 +18,3 @@ int main() {
     assert(canonical.find("feature=component.viewer") != std::string::npos);
     std::cout << "licensing parser tests passed\n";
 }
-
